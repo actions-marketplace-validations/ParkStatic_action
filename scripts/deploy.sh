@@ -4,6 +4,22 @@ source "${ACTION_PATH:?}/scripts/lib.sh"
 
 action_group "Deploy to Parkstatic"
 
+# Dry-run escape hatch. When skip-deploy is set, the whole build/prerender/
+# package pipeline has already run for real; we just verify there is an
+# artifact to upload and stop short of any network call or secret. This is what
+# the framework-compatibility test suite (and offline dry runs) use to exercise
+# every framework without a paid license or a live deploy endpoint.
+if [ "${SKIP_DEPLOY:-}" = "true" ]; then
+  if [ ! -f dist.zip ]; then
+    action_error "skip-deploy is set but dist.zip not found. The Package step must run before Deploy."
+    exit 1
+  fi
+  echo "skip-deploy is set: dist.zip is present; skipping upload to Parkstatic."
+  write_output "deployed" "false"
+  action_endgroup
+  exit 0
+fi
+
 if [ -z "${PARKSTATIC_SECRET:-}" ]; then
   action_error "parkstatic-secret is empty. Add PARKSTATIC_SECRET to your repository secrets and pass it to the action."
   exit 1

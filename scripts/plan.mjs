@@ -17,6 +17,9 @@
 //
 // Inputs (all via env):
 //   GITHUB_OUTPUT       required, file the resolved outputs are appended to
+//   PLAN_FILE           optional, path to a local JSON plan; when set the remote
+//                       and local-fallback plans are skipped entirely (dry runs,
+//                       air-gapped builds, the framework-compatibility tests)
 //   PLAN_URL            optional, plan endpoint; empty disables the remote call
 //   PARKSTATIC_SECRET   optional, bearer token for the plan endpoint
 //   PRERENDER_INPUT     optional, the action's `prerender` input ("true"/"false")
@@ -37,9 +40,13 @@ async function main() {
     const pkg = readPackageJson();
     const local = computeLocalPlan(pkg);
 
-    const remote = await fetchRemotePlan(pkg);
-    const plan = remote ?? local;
-    const source = remote ? "plan" : "fallback";
+    // A local plan file short-circuits everything: no server call, no fallback.
+    // This is how dry runs, air-gapped builds, and the framework-compatibility
+    // test suite feed a deterministic plan without a paid license or network.
+    const filePlan = readPlanFile();
+    const remote = filePlan ? null : await fetchRemotePlan(pkg);
+    const plan = filePlan ?? remote ?? local;
+    const source = filePlan ? "file" : remote ? "plan" : "fallback";
 
     for (const notice of plan.notices ?? []) {
         console.log(`::notice::${notice}`);
@@ -47,7 +54,9 @@ async function main() {
     if (plan.supported === false) {
         console.log(`::warning::Plan reports project as unsupported: ${plan.reason ?? "no reason given"}`);
     }
-    if (!remote) {
+    if (filePlan) {
+        log(`Using local plan file from ${process.env.PLAN_FILE}.`);
+    } else if (!remote) {
         log("Using local fallback plan.");
     }
 
@@ -82,6 +91,39 @@ function readPackageJson() {
         log("Failed to parse package.json:", err?.message || err);
         return {};
     }
+}
+
+// Reads and validates a local plan file when PLAN_FILE is set. Returns the plan
+// object, or null when PLAN_FILE is unset. A set-but-invalid file is a
+// configuration error the caller asked for explicitly, so we fail loud rather
+// than silently dropping to the remote/local path.
+function readPlanFile() {
+    const file = process.env.PLAN_FILE;
+    if (!file) {
+        return null;
+    }
+    if (!existsSync(file)) {
+        console.log(`::error::plan-file '${file}' was provided but does not exist.`);
+        process.exit(1);
+    }
+    let plan;
+    try {
+        plan = JSON.parse(readFileSync(file, "utf8"));
+    } catch (err) {
+        console.log(`::error::plan-file '${file}' is not valid JSON: ${err?.message || err}`);
+        process.exit(1);
+    }
+    if (!plan || typeof plan !== "object") {
+        console.log(`::error::plan-file '${file}' does not contain a plan object.`);
+        process.exit(1);
+    }
+    if (plan.planVersion !== PLAN_VERSION) {
+        console.log(
+            `::error::plan-file '${file}' has planVersion ${plan.planVersion}, but this action only supports ${PLAN_VERSION}.`,
+        );
+        process.exit(1);
+    }
+    return plan;
 }
 
 function listLockfiles() {

@@ -1,0 +1,43 @@
+name: Framework compatibility
+
+# Proves the action actually builds, prerenders, and packages every framework
+# Parkstatic claims to support. Each matrix leg runs the real action scripts
+# (detect -> plan -> install -> inject -> build -> prerender -> package -> deploy)
+# against a fixture, feeding a local plan.json (no plan server) and running the
+# deploy step in skip mode (no upload, no secret). See tests/run.sh.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixtures:
+    name: ${{ matrix.fixture }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture:
+          - vite-react-spa
+          - vite-vue-spa
+          - lovable-react-query-inject
+          - tanstack-start-prerendered
+          - tanstack-start-ssr-node
+          - tanstack-start-ssr-cloudflare
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run framework fixture
+        run: ./tests/run.sh "tests/fixtures/${{ matrix.fixture }}"

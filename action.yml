@@ -78,6 +78,22 @@ inputs:
     description: Parkstatic deploy endpoint (Supabase Edge Function). The action uploads dist.zip to this URL; the function parks the artifact in private storage and calls your WordPress site to pull it.
     required: false
     default: "https://jbunbxkodmsysnfptqoj.supabase.co/functions/v1/deploy"
+  plan-file:
+    description: |
+      Path to a local JSON build plan. When set, the action reads the plan from
+      this file and skips the remote plan endpoint entirely (no server call).
+      The file must be a plan object with a matching planVersion. Intended for
+      dry runs, air-gapped builds, and the framework-compatibility test suite.
+    required: false
+    default: ""
+  skip-deploy:
+    description: |
+      Set to "true" to build, prerender, and package the site without uploading
+      it to Parkstatic. The deploy step verifies dist.zip exists and then exits
+      successfully without any network call or secret. Intended for dry runs and
+      the framework-compatibility test suite.
+    required: false
+    default: ""
   debug:
     description: Enable verbose shell and HTTP logging.
     required: false
@@ -130,6 +146,7 @@ runs:
         DEBUG: ${{ inputs.debug }}
         PARKSTATIC_SECRET: ${{ inputs.parkstatic-secret }}
         PLAN_URL: ${{ inputs.plan-url }}
+        PLAN_FILE: ${{ inputs.plan-file }}
         PRERENDER_INPUT: ${{ inputs.prerender }}
       run: bash "$ACTION_PATH/scripts/plan.sh"
 
@@ -202,6 +219,7 @@ runs:
         DEBUG: ${{ inputs.debug }}
         PARKSTATIC_SECRET: ${{ inputs.parkstatic-secret }}
         DEPLOY_URL: ${{ inputs.deploy-url }}
+        SKIP_DEPLOY: ${{ inputs.skip-deploy }}
         GH_SHA: ${{ github.sha }}
         GH_REF: ${{ github.ref }}
         GH_REPO: ${{ github.repository }}

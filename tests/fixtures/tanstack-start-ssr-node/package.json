@@ -1,0 +1,18 @@
+{
+  "name": "fixture-tanstack-start-ssr-node",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.8",
+    "@tanstack/react-start": "1.168.13",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "5.2.0",
+    "vite": "7.3.3"
+  }
+}
