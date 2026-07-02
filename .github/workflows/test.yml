@@ -28,6 +28,10 @@ jobs:
           - tanstack-start-prerendered
           - tanstack-start-ssr-node
           - tanstack-start-ssr-cloudflare
+          - astro-static
+          - sveltekit-static
+          - remix-vite
+          - nuxt-static
     steps:
       - uses: actions/checkout@v5
 
