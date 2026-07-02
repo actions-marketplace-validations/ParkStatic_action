@@ -29,7 +29,7 @@ echo "${C_BOLD}==================================================${C_RESET}"
 cd "$FIXTURE_DIR"
 
 # Start from a clean slate so a re-run never asserts against stale output.
-rm -rf dist build dist.zip .npmrc
+rm -rf dist build .output .nitro .svelte-kit out dist.zip .npmrc
 
 GITHUB_OUTPUT="$(mktemp)"
 export GITHUB_OUTPUT
@@ -56,8 +56,9 @@ BUILT_DEPS="$(get_output built-deps)"
 INJECT_DEPS="$(get_output inject-deps)"
 BUILD_KIND="$(get_output build-kind)"
 BUILD_SCRIPT="$(get_output build-script)"
+PLAN_OUTPUT_DIR="$(get_output plan-output-dir)"
 PRERENDER_ENABLED="$(get_output prerender-enabled)"
-export BUILT_DEPS INJECT_DEPS BUILD_KIND BUILD_SCRIPT PRERENDER_ENABLED
+export BUILT_DEPS INJECT_DEPS BUILD_KIND BUILD_SCRIPT PLAN_OUTPUT_DIR PRERENDER_ENABLED
 
 # 3. Install project dependencies (+ the action's prerender tooling).
 run_step install.sh

@@ -294,15 +294,33 @@ async function renderPage(page, origin, path, waitUntil, captureRaw) {
   //     simply re-renders over it, so interactivity is preserved with no
   //     hydration-mismatch risk.
   const htmlPromise = captureRaw && response ? response.text() : page.content();
-  const [html, hrefs] = await Promise.all([
+  const [rawHtml, hrefs] = await Promise.all([
     htmlPromise,
     page.$$eval("a[href]", (els) => els.map((el) => el.getAttribute("href"))),
   ]);
+
+  // `page.content()` serializes the post-hydration DOM, and a hydrated app
+  // often injects <link rel="modulepreload"> / <link rel="prefetch"> tags for
+  // its chunks at runtime. The browser resolves those hrefs against the crawl
+  // origin, so the serialized markup carries absolute http://127.0.0.1:<port>
+  // URLs that point at the (now-stopped) crawl server. Left as-is they break
+  // the packaged build for real visitors AND the smoke test. Rebase anything
+  // pointing back at our own origin to a root-relative path.
+  const html = rebaseOrigin(rawHtml, origin);
 
   const finalPath = new URL(page.url()).pathname;
   const discovered = collectInternalLinks(hrefs, origin, finalPath);
 
   return { html, discovered };
+}
+
+// Rewrites absolute URLs that point at the crawl origin back to root-relative
+// paths (http://127.0.0.1:<port>/_app/x.js -> /_app/x.js). Only exact-origin
+// matches are touched; cross-origin URLs (CDN-hosted chunks, third-party
+// scripts) are preserved verbatim.
+function rebaseOrigin(html, origin) {
+  if (!origin || !html.includes(origin)) return html;
+  return html.split(origin).join("");
 }
 
 function collectInternalLinks(hrefs, origin, currentPath) {

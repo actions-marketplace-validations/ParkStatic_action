@@ -31,6 +31,18 @@ const PLAN_VERSION = 1;
 const REQUEST_TIMEOUT_MS = 15_000;
 const BUILT_DEPENDENCIES = ["esbuild", "@swc/core"];
 
+// Static output directory each framework writes its build to. The action uses
+// this hint to locate the deployable output; it falls back to a candidate-list
+// heuristic when outputDir is absent. Vite-only SPAs omit it on purpose.
+const STATIC_OUTPUT_DIRS = {
+    "astro": "dist",
+    "@sveltejs/kit": "build",
+    "@remix-run/dev": "build/client",
+    "@react-router/dev": "build/client",
+    "nuxt": ".output/public",
+    "next": "out",
+};
+
 const debug = process.env.DEBUG === "true";
 const log = (...args) => debug && console.log("[plan]", ...args);
 
@@ -69,12 +81,14 @@ async function main() {
         "inject-deps": (plan.injectDependencies ?? []).join(" "),
         "build-kind": plan.build?.kind ?? local.build.kind,
         "build-script": plan.build?.script ?? "build",
+        "plan-output-dir": plan.build?.outputDir ?? "",
         "prerender-enabled": String(prerenderEnabled),
         "plan-source": source,
     });
 
     console.log(
         `Build plan resolved from ${source}: build=${plan.build?.kind ?? local.build.kind}, ` +
+        `output=${plan.build?.outputDir ?? "(auto)"}, ` +
         `inject=[${(plan.injectDependencies ?? []).join(", ")}], prerender=${prerenderEnabled}.`,
     );
 }
@@ -132,7 +146,10 @@ function listLockfiles() {
 
 // Mirrors the plan edge function's logic so behavior is identical when the
 // endpoint is unreachable. Kept deliberately conservative: only the
-// already-public query-core fix is injected here.
+// already-public query-core fix is injected here. Framework output-path
+// knowledge lives here too so the offline fallback still locates builds for the
+// common static frameworks — the edge function is the real source of truth and
+// may override this with `build.outputDir`.
 function computeLocalPlan(pkg) {
     const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
     const has = (name) => Object.prototype.hasOwnProperty.call(deps, name);
@@ -146,14 +163,25 @@ function computeLocalPlan(pkg) {
 
     const hasBuildScript = !!(pkg.scripts && typeof pkg.scripts === "object" && "build" in pkg.scripts);
 
+    // The first matching framework wins an output-dir hint. Vite-only SPAs
+    // leave outputDir empty so build.sh falls back to its candidate-list
+    // heuristic (dist/client, dist, build, ...).
+    let outputDir = "";
+    for (const [dep, dir] of Object.entries(STATIC_OUTPUT_DIRS)) {
+        if (has(dep)) {
+            outputDir = dir;
+            break;
+        }
+    }
+
     return {
         planVersion: PLAN_VERSION,
         supported: true,
         install: { builtDependencies: BUILT_DEPENDENCIES },
         injectDependencies,
         build: hasBuildScript
-            ? { kind: "package-script", script: "build" }
-            : { kind: "vite-build", script: "build" },
+            ? { kind: "package-script", script: "build", outputDir }
+            : { kind: "vite-build", script: "build", outputDir },
         prerender: { recommended: true },
         notices,
     };

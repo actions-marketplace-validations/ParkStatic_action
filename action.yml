@@ -182,6 +182,7 @@ runs:
         BUILD_COMMAND: ${{ inputs.build-command }}
         BUILD_KIND: ${{ steps.plan.outputs.build-kind }}
         BUILD_SCRIPT: ${{ steps.plan.outputs.build-script }}
+        PLAN_OUTPUT_DIR: ${{ steps.plan.outputs.plan-output-dir }}
         OUTPUT_DIR_OVERRIDE: ${{ inputs.output-dir }}
         PACKAGE_MANAGER: ${{ steps.setup.outputs.manager }}
       run: bash "$ACTION_PATH/scripts/build.sh"

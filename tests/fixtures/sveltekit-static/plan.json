@@ -1,0 +1,9 @@
+{
+  "planVersion": 1,
+  "supported": true,
+  "install": { "builtDependencies": ["esbuild", "@swc/core"] },
+  "injectDependencies": [],
+  "build": { "kind": "package-script", "script": "build", "outputDir": "build" },
+  "prerender": { "recommended": true },
+  "notices": []
+}

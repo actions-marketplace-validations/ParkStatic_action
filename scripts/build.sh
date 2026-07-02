@@ -56,7 +56,18 @@ action_group "Locate output"
 #            exists yet. The prerender step boots the handler — via Miniflare
 #            for the Cloudflare preset, via a generic Node fetch server
 #            otherwise — and crawls it to materialize HTML into dist/client.
-if OUTPUT_DIR=$(find_output_dir "${OUTPUT_DIR_OVERRIDE:-}"); then
+# Resolve the static output directory. Priority:
+#   1. User `output-dir` input — strict, always wins (respected verbatim).
+#   2. Plan `plan-output-dir` — advisory; used only when its index.html actually
+#      exists, so an SSR build (no static index.html yet) falls through to SSR
+#      detection below instead of being mislocated.
+#   3. Candidate-list heuristic in find_output_dir.
+LOCATE_OVERRIDE="${OUTPUT_DIR_OVERRIDE:-}"
+if [ -z "$LOCATE_OVERRIDE" ] && [ -n "${PLAN_OUTPUT_DIR:-}" ] && [ -f "${PLAN_OUTPUT_DIR}/index.html" ]; then
+  LOCATE_OVERRIDE="$PLAN_OUTPUT_DIR"
+fi
+
+if OUTPUT_DIR=$(find_output_dir "$LOCATE_OVERRIDE"); then
   if [ ! -f "$OUTPUT_DIR/index.html" ]; then
     action_error "Could not find index.html in $OUTPUT_DIR."
     exit 1
@@ -85,7 +96,7 @@ elif SSR_ENTRY=$(find_ssr_bundle); then
   write_output "ssr-entry" "$SSR_ENTRY"
   write_output "ssr-runtime" "$SSR_RUNTIME"
 else
-  action_error "Could not find a deployable build. Expected an index.html in dist/client, dist, or build (static SPA), or an SSR entry at dist/server/index.js or dist/server/server.js."
+  action_error "Could not find a deployable build. Expected an index.html in dist/client, dist, build, build/client, .output/public, or out (static SPA), or an SSR entry at dist/server/index.js or dist/server/server.js."
   exit 1
 fi
 

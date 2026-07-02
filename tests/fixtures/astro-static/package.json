@@ -1,0 +1,12 @@
+{
+  "name": "fixture-astro-static",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "build": "astro build"
+  },
+  "dependencies": {
+    "astro": "^5.0.0"
+  }
+}

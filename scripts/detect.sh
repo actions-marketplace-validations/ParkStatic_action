@@ -41,11 +41,28 @@ else
   action_notice "No lockfile found; using pnpm without a frozen lockfile."
 fi
 
-# Sanity-check the project shape. We require Vite somewhere in package.json
-# (deps, devDeps, or a Lovable wrapper). Anything beyond that is treated as a
-# black-box build — the universal serve+crawl prerender step handles it.
-if ! grep -Eq '"(vite|@lovable\.dev/[^"]+)"' package.json; then
-  action_error "Unsupported project: expected vite (or a Lovable wrapper) in package.json."
+# Sanity-check the project shape. We deliberately do NOT classify frameworks
+# here — that is the plan step's job (the edge function holds the proprietary
+# build recipes). This guard only rejects repos that clearly aren't a buildable
+# frontend: no "build" script AND no recognized frontend tool. Anything with a
+# build script is trusted to build itself; anything with a known framework dep
+# is trusted even without one. Parsed with Node so the dep keys are matched as
+# real object keys rather than as substrings of some unrelated string.
+if ! node -e '
+  const fs = require("node:fs");
+  const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+  const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+  const has = (k) => Object.prototype.hasOwnProperty.call(deps, k);
+  const frameworks = [
+    "vite", "next", "astro", "nuxt",
+    "@sveltejs/kit", "@remix-run/dev", "@react-router/dev", "@solidjs/start",
+  ];
+  const knownFramework = frameworks.some(has) ||
+    Object.keys(deps).some((d) => d.startsWith("@lovable.dev/"));
+  const hasBuild = !!(pkg.scripts && typeof pkg.scripts === "object" && "build" in pkg.scripts);
+  process.exit(knownFramework || hasBuild ? 0 : 1);
+' 2>/dev/null; then
+  action_error "Unsupported project: expected a build script or a recognized frontend framework (vite, next, astro, nuxt, @sveltejs/kit, @remix-run/dev, @react-router/dev, @solidjs/start) in package.json."
   exit 1
 fi
 

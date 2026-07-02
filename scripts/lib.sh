@@ -109,6 +109,10 @@ http_post() {
   HTTP_BODY="${response%$'\n'__HTTP_STATUS__:*}"
 }
 
+# Note: the plan step normally supplies an explicit output dir (via the
+# `plan-output-dir` output) for frameworks whose build writes somewhere other
+# than the Vite defaults. This candidate list is the fallback for when no plan
+# is available (offline, no license) and covers the common static frameworks.
 find_output_dir() {
   local override="${1:-}"
 
@@ -118,7 +122,7 @@ find_output_dir() {
   fi
 
   local candidate
-  for candidate in dist/client dist build; do
+  for candidate in dist/client dist build build/client .output/public out; do
     if [ -f "$candidate/index.html" ]; then
       echo "$candidate"
       return 0

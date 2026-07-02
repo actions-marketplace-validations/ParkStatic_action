@@ -1,8 +1,9 @@
 # Parkstatic Build and Deploy
 
-GitHub Action to build and deploy Vite-based frontends to
-[Parkstatic](https://parkstatic.site) — Vite SPAs, TanStack Start, React Router
-apps, and other frameworks that ship a standard `build` script.
+GitHub Action to build and deploy static frontends to
+[Parkstatic](https://parkstatic.site) — Vite SPAs, TanStack Start, React Router,
+Remix, Astro, SvelteKit, Nuxt, and other frameworks that ship a standard `build`
+script and produce a static output directory.
 
 ## Prerequisites
 
@@ -58,6 +59,45 @@ uploads it to your Parkstatic instance. Your WordPress site picks up the new
 build shortly after the workflow finishes.
 
 The action never modifies your repository — no commits, branches, or PRs.
+
+## Framework support
+
+The action runs your project's own `build` script, locates the static output it
+produced, prerenders it with a headless browser if needed, and ships the result.
+Framework-specific build knowledge (which output directory to expect, which
+dependencies to inject) is resolved by the Parkstatic plan endpoint, with a
+conservative local fallback when the endpoint is unreachable. You can always
+override detection with the `build-command` and `output-dir` inputs.
+
+### Supported — static output
+
+These frameworks produce a static directory the action can locate and deploy
+directly. Output paths listed are the defaults the action looks for.
+
+| Framework                              | Build output        | Notes                                                                 |
+| -------------------------------------- | ------------------- | --------------------------------------------------------------------- |
+| Vite SPA (React, Vue, Svelte, Solid…)  | `dist`              | Empty-shell SPA; the prerender crawl captures the hydrated DOM.       |
+| TanStack Start (prerendered)           | `dist/client`       | Framework's own prerendered HTML is deployed verbatim; crawl skipped. |
+| TanStack Start / Vite SSR (Node)       | `dist/client`       | SSR handler booted on a local Node fetch server, then crawled.        |
+| TanStack Start SSR (Cloudflare)        | `dist/client`       | SSR worker booted via Miniflare, then crawled.                       |
+| React Router (framework mode)          | `build/client`      | Static or SPA build.                                                  |
+| Remix (Vite, SPA mode `ssr: false`)    | `build/client`      | Static `index.html` shell; crawl captures the hydrated route.         |
+| Astro                                  | `dist`              | Fully prerendered at build time.                                      |
+| SvelteKit (`adapter-static`)           | `build`             | Prerender every route (`export const prerender = true`).              |
+| Nuxt (`nuxt generate`)                 | `.output/public`    | Static generation.                                                    |
+| Next.js (`output: 'export'`)           | `out`               | Static export only (see below).                                       |
+
+### Not supported
+
+| Framework / shape                    | Why                                                                                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Next.js SSR / SSG (default `.next`)  | Next's server runtime differs from the TanStack Start / Vite-SSR shape the action boots; there is no adapter for the Next standalone server.   |
+| Frameworks with no `build` script    | The action relies on your project's `build` script (or a recognized frontend dependency) to produce output. A bare `index.html` repo won't build. |
+| Non-JavaScript static sites          | The action expects a `package.json` and a Node build. Plain HTML/CSS sites with no build step are not handled.                                 |
+
+If your framework produces a static `index.html` somewhere not listed above,
+point the action at it with `output-dir`. If it needs a non-`build` script, pass
+`build-command`.
 
 ## Inputs
 
